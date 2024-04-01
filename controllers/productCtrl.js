@@ -62,35 +62,102 @@ const { pool } = require('../config/db'); // adjust the path according to your p
 //   }
 // });
 
+// const createProduct = asyncHandler(async (req, res) => {
+//   try {
+//     // console.log(req.files)
+//     // let  data = JSON.parse(req.body.data)
+    
+//     console.log(req.body)
+//     const { title, description, brand, price, category,color, quantity  } = req.body;
+//     const slug = req.body.title ? slugify(req.body.title) : "";
+
+//     // console.log({ title, description, brand, quantity, price, files: req.files });
+
+//     // Insert product into the database
+//     const connection = await pool.getConnection();
+
+//     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`;
+//     const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price]);
+//     const productId = result.insertId;
+
+//     // insert to color table
+//     const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
+//     const [colorResult] = await connection.execute(colorSql, [color, productId]);
+
+//     console.log(colorResult)
+//     // Upload images and insert image details into the database
+//     // console.log(result)
+//     const uploader = (path) => cloudinaryUploadImg(path, 'images');
+//     const urls = [];
+//     const files = req.files;
+//     for (const file of files) {
+//       const { path } = file;
+//       const newPath = await uploader(path);
+//       urls.push(newPath);
+//       // fs.unlinkSync(path);
+
+//       const imageSql = 'INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)';
+//       await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
+//     }
+
+//     connection.release();
+
+//     res.json({ message: "Product created successfully", productId, urls });
+//   } catch (error) {
+//     console.log(error);
+//     res.status(500).json({ message: "Failed to create product" });
+//   }
+// });
+
 const createProduct = asyncHandler(async (req, res) => {
   try {
-    // console.log(req.files)
-    let  data = JSON.parse(req.body.data)
-    console.log(data)
-    const { title, description, brand, quantity, price } = data;
+    console.log(req.body);
+    const { title, description, brand, price, category, color, quantity, images } = req.body;
     const slug = req.body.title ? slugify(req.body.title) : "";
-
-    // console.log({ title, description, brand, quantity, price, files: req.files });
 
     // Insert product into the database
     const connection = await pool.getConnection();
-    const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`;
-    const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price]);
+
+    const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+    const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price, category]);
     const productId = result.insertId;
 
+
+        // Insert color into the database
+        const colorArray = JSON.parse(color); // Convert color to array
+        console.log (colorArray);
+        for (let i = 0; i < colorArray.length; i++) {
+          const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
+          const [colorName] = await connection.execute(colorNameFind, [colorArray[i]]);
+    
+          const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
+          const colordone = await connection.execute(colorSql, [colorName[0].col_name, productId]);
+        }
+    // Insert color into the database
+    // const colorArray = JSON.parse(color); // Convert color to array
+    // console.log (colorArray);
+    // for (let i = 0; i < colorArray.length; i++) {
+    //   const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
+    //   const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
+    //   const colorName = await connection.execute(colorNameFind, [colorArray[i]]);
+      
+   
+    //   const colordone = await connection.execute(colorSql, [colorName, productId]);
+    // }
+
     // Upload images and insert image details into the database
-    // console.log(result)
+    
     const uploader = (path) => cloudinaryUploadImg(path, 'images');
     const urls = [];
     const files = req.files;
-    for (const file of files) {
-      const { path } = file;
+    console.log(files);
+    for (let i = 0; i < files.length; i++) {
+      const { path } = files[i];
       const newPath = await uploader(path);
       urls.push(newPath);
-      // fs.unlinkSync(path);
 
       const imageSql = 'INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)';
-      await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
+      const [addedImage] = await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
     }
 
     connection.release();
@@ -101,6 +168,7 @@ const createProduct = asyncHandler(async (req, res) => {
     res.status(500).json({ message: "Failed to create product" });
   }
 });
+
 
 
 // const createProduct = asyncHandler(async (req, res) => {

@@ -18,7 +18,8 @@ const { pool } = require('../config/db'); // adjust the path according to your p
 const createCategory = async (req, res) => {
   try {
     // Extract category details from the request body
-    const { cat_name, cat_description } = req.body;
+    const  cat_name  = req.body.title;
+
 
     // Connect to MySQL database
     const connection = await pool.getConnection();
@@ -42,10 +43,10 @@ const createCategory = async (req, res) => {
 
     // Insert a new category into the database
     const insertCategoryQuery = `
-      INSERT INTO category (cat_name, cat_description)
-      VALUES (?, ?)
+      INSERT INTO category (cat_name)
+      VALUES (?)
     `;
-    const [insertResult] = await connection.execute(insertCategoryQuery, [cat_name, cat_description]);
+    const [insertResult] = await connection.execute(insertCategoryQuery, [cat_name]);
 
     // Fetch the newly inserted category from the database
     const categoryId = insertResult.insertId;
@@ -78,8 +79,8 @@ const updateCategory = async (req, res) => {
 
   try {
     // Connect to MySQL database
-    const connection = req.connection;
-    await checkConnection(connection);
+    const connection = await pool.getConnection();
+    
 
     // Check if the category name already exists (excluding the current category being updated)
     const checkCategoryQuery = `
@@ -87,7 +88,7 @@ const updateCategory = async (req, res) => {
       FROM category
       WHERE cat_name = ? AND cat_id != ?
     `;
-    const [existingCategory] = await connection.promise().query(checkCategoryQuery, [cat_name, id]);
+    const [existingCategory] = await connection.execute(checkCategoryQuery, [cat_name, id]);
 
     // If the category name already exists (excluding the current category being updated), return an error
     if (existingCategory.length > 0) {
@@ -96,7 +97,7 @@ const updateCategory = async (req, res) => {
 
     // Update category in the database
     const updateCategoryQuery = "UPDATE category SET cat_name = ?, cat_description = ? WHERE cat_id = ?";
-    const [result] = await connection.promise().query(updateCategoryQuery, [cat_name, cat_description, id]);
+    const [result] = await connection.execute(updateCategoryQuery, [cat_name, cat_description, id]);
 
     // Check if the category was updated successfully
     if (result.affectedRows === 0) {
@@ -105,7 +106,7 @@ const updateCategory = async (req, res) => {
 
     // Fetch the updated category from the database
     const getCategoryQuery = "SELECT * FROM category WHERE cat_id = ?";
-    const [updatedCategory] = await connection.promise().query(getCategoryQuery, [id]);
+    const [updatedCategory] = await connection.execute(getCategoryQuery, [id]);
 
     // Send the updated category as response
     res.json(updatedCategory[0]);
@@ -140,16 +141,36 @@ const deleteCategory = asyncHandler(async (req, res) => {
     throw new Error(error);
   }
 });
+
 const getCategory = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  validateMongoDbId(id);
+  
   try {
-    const getaCategory = await PCategory.findById(id);
+    const connection = await pool.getConnection();
+    sql = "SELECT * FROM category WHERE cat_id = ?"
+
+    const [getaCategory] = await connection.execute(sql, [id]);
+    console.log("category rows", getaCategory);
+
     res.json(getaCategory);
-  } catch (error) {
+  }
+  catch (error) {
     throw new Error(error);
   }
 });
+
+// const getCategory = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   validateMongoDbId(id);
+//   try {
+//     const getaCategory = await PCategory.findById(id);
+//     res.json(getaCategory);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
+
+
 const getallCategory = asyncHandler(async (req, res) => {
   try {
     const connection = await pool.getConnection();

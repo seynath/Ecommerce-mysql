@@ -7,7 +7,7 @@ const pool = mysql.createPool({
   user: process.env.MYSQL_USER,
   password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DB,
-  connectionLimit: 10 // number of connections you want to allow at once
+  // connectionLimit: 10 // number of connections you want to allow at once
 });
 
 const checkConnection = async () => {
