@@ -1210,41 +1210,80 @@ const getWishlist = asyncHandler(async (req, res) => {
   }
 });
 
+
 const userCart = asyncHandler(async (req, res) => {
   const { cart } = req.body;
-  const { _id } = req.user;
-  validateMongoDbId(_id);
+  const { id } = req.user;
   try {
+    const connection = await pool.getConnection();
     let products = [];
-    const user = await User.findById(_id);
+    const user = await connection.execute('SELECT * FROM users WHERE id = ?', [id]);
     // check if user already have product in cart
-    const alreadyExistCart = await Cart.findOne({ orderby: user._id });
-    if (alreadyExistCart) {
-      alreadyExistCart.remove();
+    const alreadyExistCart = await connection.execute('SELECT * FROM cart WHERE orderby = ?', [user[0].id]);
+    if (alreadyExistCart.length > 0) {
+      await connection.execute('DELETE FROM cart WHERE orderby = ?', [user[0].id]);
     }
     for (let i = 0; i < cart.length; i++) {
       let object = {};
-      object.product = cart[i]._id;
+      object.product_id = cart[i].id;
       object.count = cart[i].count;
       object.color = cart[i].color;
-      let getPrice = await Product.findById(cart[i]._id).select("price").exec();
-      object.price = getPrice.price;
+      let getPrice = await connection.execute('SELECT price FROM products WHERE id = ?', [cart[i].id]);
+      object.price = getPrice[0].price;
       products.push(object);
     }
     let cartTotal = 0;
     for (let i = 0; i < products.length; i++) {
       cartTotal = cartTotal + products[i].price * products[i].count;
     }
-    let newCart = await new Cart({
+    const result = await connection.execute('INSERT INTO cart (products, cartTotal, orderby) VALUES (?, ?, ?)', [JSON.stringify(products), cartTotal, user[0].id]);
+    const newCart = {
+      id: result.insertId,
       products,
       cartTotal,
-      orderby: user?._id,
-    }).save();
+      orderby: user[0].id,
+    };
     res.json(newCart);
   } catch (error) {
     throw new Error(error);
   }
 });
+
+// const userCart = asyncHandler(async (req, res) => {
+//   const { cart } = req.body;
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+//   try {
+//     let products = [];
+//     const user = await User.findById(_id);
+//     // check if user already have product in cart
+//     const alreadyExistCart = await Cart.findOne({ orderby: user._id });
+//     if (alreadyExistCart) {
+//       alreadyExistCart.remove();
+//     }
+//     for (let i = 0; i < cart.length; i++) {
+//       let object = {};
+//       object.product = cart[i]._id;
+//       object.count = cart[i].count;
+//       object.color = cart[i].color;
+//       let getPrice = await Product.findById(cart[i]._id).select("price").exec();
+//       object.price = getPrice.price;
+//       products.push(object);
+//     }
+//     let cartTotal = 0;
+//     for (let i = 0; i < products.length; i++) {
+//       cartTotal = cartTotal + products[i].price * products[i].count;
+//     }
+//     let newCart = await new Cart({
+//       products,
+//       cartTotal,
+//       orderby: user?._id,
+//     }).save();
+//     res.json(newCart);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 
 const getUserCart = asyncHandler(async (req, res) => {
   const { _id } = req.user;

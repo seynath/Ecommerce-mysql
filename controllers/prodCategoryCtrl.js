@@ -177,7 +177,7 @@ const getallCategory = asyncHandler(async (req, res) => {
     sql = "SELECT * FROM category"
 
     const [getallCategory] = await connection.execute(sql);
-    console.log("category rows", getallCategory);
+    // console.log("category rows", getallCategory);
 
     res.json(getallCategory);
   } catch (error) {

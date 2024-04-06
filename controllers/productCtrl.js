@@ -24,9 +24,12 @@
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
 const validateMongoDBId = require("../utils/validateMongodbid");
-const { cloudinaryUploadImg, cloudinaryDeleteImg } = require("../utils/cloudinary");
+const {
+  cloudinaryUploadImg,
+  cloudinaryDeleteImg,
+} = require("../utils/cloudinary");
 const fs = require("fs");
-const { pool } = require('../config/db'); // adjust the path according to your project structure
+const { pool } = require("../config/db"); // adjust the path according to your project structure
 // const createProduct = asyncHandler(async (req, res) => {
 //   try {
 //     const { title, description, brand, quantity, price } = req.body;
@@ -66,7 +69,7 @@ const { pool } = require('../config/db'); // adjust the path according to your p
 //   try {
 //     // console.log(req.files)
 //     // let  data = JSON.parse(req.body.data)
-    
+
 //     console.log(req.body)
 //     const { title, description, brand, price, category,color, quantity  } = req.body;
 //     const slug = req.body.title ? slugify(req.body.title) : "";
@@ -112,75 +115,110 @@ const { pool } = require('../config/db'); // adjust the path according to your p
 const createProduct = asyncHandler(async (req, res) => {
   try {
     console.log(req.body);
-    const { title, description, brand, price, category, color, quantity, images } = req.body;
+    const {
+      title,
+      description,
+      brand,
+      price,
+      category,
+      color,
+      size,
+      quantity,
+    } = req.body;
     const slug = req.body.title ? slugify(req.body.title) : "";
+    console.log({ title, description, brand, quantity, price, category, size });
 
     // Insert product into the database
     const connection = await pool.getConnection();
 
     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-    const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price, category]);
+    const [result] = await connection.execute(sql, [
+      title,
+      slug,
+      description,
+      brand,
+      quantity,
+      price,
+      category,
+    ]);
     const productId = result.insertId;
 
-
-        // Insert color into the database
-        const colorArray = JSON.parse(color); // Convert color to array
-        console.log (colorArray);
-        for (let i = 0; i < colorArray.length; i++) {
-          const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
-          const [colorName] = await connection.execute(colorNameFind, [colorArray[i]]);
-    
-          const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
-          const colordone = await connection.execute(colorSql, [colorName[0].col_name, productId]);
-        }
     // Insert color into the database
-    // const colorArray = JSON.parse(color); // Convert color to array
-    // console.log (colorArray);
-    // for (let i = 0; i < colorArray.length; i++) {
-    //   const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
-    //   const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
-    //   const colorName = await connection.execute(colorNameFind, [colorArray[i]]);
-      
-   
-    //   const colordone = await connection.execute(colorSql, [colorName, productId]);
-    // }
+    const colorArray = JSON.parse(color); // Convert color to array
+    console.log(colorArray);
+    for (let i = 0; i < colorArray.length; i++) {
+      // const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
+      // const [colorName] = await connection.execute(colorNameFind, [colorArray[i]]);
 
-    // Upload images and insert image details into the database
-    
-    const uploader = (path) => cloudinaryUploadImg(path, 'images');
-    const urls = [];
-    const files = req.files;
-    console.log(files);
-    for (let i = 0; i < files.length; i++) {
-      const { path } = files[i];
-      const newPath = await uploader(path);
-      urls.push(newPath);
-
-      const imageSql = 'INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)';
-      const [addedImage] = await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
+      // const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
+      // const colordone = await connection.execute(colorSql, [colorName[0].col_name, productId]);
+      const colorSql = `INSERT INTO color_product (color_code, product_id) VALUES (?, ?)`;
+      const colordone = await connection.execute(colorSql, [
+        colorArray[i],
+        productId,
+      ]);
     }
 
-    connection.release();
+    const sizeArray = JSON.parse(size);
+    if (sizeArray.length > 0) {
+      for (let i = 0; i < sizeArray.length; i++) {
+        const sizeSql = `INSERT INTO size_product (size_id, product_id) VALUES (?, ?)`;
+        const sizedone = await connection.execute(sizeSql, [
+          sizeArray[i],
+          productId,
+        ]);
+      }
+      // Insert color into the database
+      // const colorArray = JSON.parse(color); // Convert color to array
+      // console.log (colorArray);
+      // for (let i = 0; i < colorArray.length; i++) {
+      //   const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
+      //   const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
+      //   const colorName = await connection.execute(colorNameFind, [colorArray[i]]);
 
-    res.json({ message: "Product created successfully", productId, urls });
+      //   const colordone = await connection.execute(colorSql, [colorName, productId]);
+      // }
+
+      // Upload images and insert image details into the database
+
+      const uploader = (path) => cloudinaryUploadImg(path, "images");
+      const urls = [];
+      const files = req.files;
+      console.log(files);
+      for (let i = 0; i < files.length; i++) {
+        const { path } = files[i];
+        const newPath = await uploader(path);
+        urls.push(newPath);
+
+        const imageSql =
+          "INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)";
+        const [addedImage] = await connection.execute(imageSql, [
+          newPath.url,
+          productId,
+          newPath.asset_id,
+          newPath.public_id,
+        ]);
+      }
+
+      connection.release();
+
+      res.json({ message: "Product created successfully", productId, urls });
+    }
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Failed to create product" });
   }
 });
 
-
-
 // const createProduct = asyncHandler(async (req, res) => {
 //   try {
 //     const { title, description, brand, quantity, price } = req.body;
-    
+
 //     const slug = req.body.title ? slugify(req.body.title) : "";
 //     const connection = await pool.getConnection();
 //     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`;
 //     const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price]);
 
-    
 //     connection.release();
 
 //     res.json({ message: "Product created successfully" });
@@ -189,9 +227,6 @@ const createProduct = asyncHandler(async (req, res) => {
 //     res.status(500).json({ message: "Failed to create product" });
 //   }
 // });
-
-
-
 
 // const createProduct = asyncHandler(async (req, res) => {
 //   try {
@@ -207,7 +242,7 @@ const createProduct = asyncHandler(async (req, res) => {
 //     await checkConnection(connection);
 
 //     // Insert the new product into the database
-//     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) 
+//     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price)
 //                  VALUES (?, ?, ?, ?, ?, ?)`;
 //     await connection
 //       .promise()
@@ -371,7 +406,6 @@ const getProduct = asyncHandler(async (req, res) => {
 //   }
 // })
 
-
 const getAllProducts = async (req, res) => {
   try {
     // Get a MySQL connection from the pool
@@ -379,9 +413,10 @@ const getAllProducts = async (req, res) => {
 
     // Execute a SELECT query to fetch all users
     const [rows] = await connection.execute("SELECT * FROM product");
-      if(rows.length === 0){
-        connection.release();
-        return res.status(404).json({ message: "No Products Found" });}
+    if (rows.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: "No Products Found" });
+    }
     connection.release();
 
     // Send the fetched users in the response
@@ -390,7 +425,6 @@ const getAllProducts = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 // const getAllProducts = asyncHandler(async (req, res) => {
 //   try {
@@ -432,7 +466,6 @@ const getAllProducts = async (req, res) => {
 //     res.status(500).json({ message: 'Internal Server Error' });
 //   }
 // });
-
 
 // const getAllProducts = asyncHandler(async (req, res) => {
 //   try {
@@ -486,36 +519,27 @@ const addToWishlist = asyncHandler(async (req, res) => {
   // const  _id = 13;
   try {
     // Connect to MySQL database
-    const connection = req.connection;
-
-    // Check if connection is established
-    await checkConnection(connection);
+    const connection = await pool.getConnection();
 
     // Check if the user has already added the product to their wishlist
-    const [existingWishlist] = await connection
-      .promise()
-      .query("SELECT * FROM wishlist WHERE user_id = ? AND product_id = ?", [
-        _id,
-        prodId,
-      ]);
+    const [existingWishlist] = await connection.execute(
+      "SELECT * FROM wishlist WHERE user_id = ? AND product_id = ?",
+      [_id, prodId]
+    );
 
     if (existingWishlist.length > 0) {
       // If the product is already in the wishlist, remove it
-      await connection
-        .promise()
-        .query("DELETE FROM wishlist WHERE user_id = ? AND product_id = ?", [
-          _id,
-          prodId,
-        ]);
+      await connection.execute(
+        "DELETE FROM wishlist WHERE user_id = ? AND product_id = ?",
+        [_id, prodId]
+      );
       res.json({ message: "Product removed from wishlist" });
     } else {
       // If the product is not in the wishlist, add it
-      await connection
-        .promise()
-        .query("INSERT INTO wishlist (user_id, product_id) VALUES (?, ?)", [
-          _id,
-          prodId,
-        ]);
+      await connection.execute(
+        "INSERT INTO wishlist (user_id, product_id) VALUES (?, ?)",
+        [_id, prodId]
+      );
       res.json({ message: "Product added to wishlist" });
     }
   } catch (error) {
@@ -557,78 +581,74 @@ const addToWishlist = asyncHandler(async (req, res) => {
 //   }
 // });
 
-
 const rating = async (req, res) => {
   // const { _id } = req.user;
   const { star, prodId, comment } = req.body;
   const _id = 12;
   try {
+    // Connect to MySQL database
+    const connection = await pool.getConnection();
 
-      // Connect to MySQL database
-      const connection = req.connection;
-      await checkConnection(connection);
-
-      // Check if the user has already rated the product
-      const checkRatingQuery = `
+    // Check if the user has already rated the product
+    const checkRatingQuery = `
           SELECT *
           FROM ratings
           WHERE user_id = ? AND product_id = ?
       `;
-      const [ratingRows] = await connection.promise().query(checkRatingQuery, [_id, prodId]);
-      const alreadyRated = ratingRows.length > 0;
+    const [ratingRows] = await connection.execute(checkRatingQuery, [_id, prodId]);
+    const alreadyRated = ratingRows.length > 0;
 
-      if (alreadyRated) {
-          // Update existing rating
-          const updateRatingQuery = `
+    if (alreadyRated) {
+      // Update existing rating
+      const updateRatingQuery = `
               UPDATE ratings
               SET star = ?, comment = ?
               WHERE user_id = ? AND product_id = ?
           `;
-          await connection.promise().query(updateRatingQuery, [star, comment, _id, prodId]);
-      } else {
-          // Add new rating
-          const addRatingQuery = `
+      await connection.execute(updateRatingQuery, [star, comment, _id, prodId]);
+    } else {
+      // Add new rating
+      const addRatingQuery = `
               INSERT INTO ratings (user_id, product_id, star, comment)
               VALUES (?, ?, ?, ?)
           `;
-          await connection.promise().query(addRatingQuery, [_id, prodId, star, comment]);
-      }
+      await connection.execute(addRatingQuery, [_id, prodId, star, comment]);
+    }
 
-      // Calculate total rating and update product
-      const calculateRatingQuery = `
+    // Calculate total rating and update product
+    const calculateRatingQuery = `
           SELECT AVG(star) AS total_rating
           FROM ratings
           WHERE product_id = ?
       `;
-      const [averageRatingRows] = await connection.promise().query(calculateRatingQuery, [prodId]);
-      console.log("Average Rating Rows:", averageRatingRows);
-      const totalRating = averageRatingRows[0].total_rating;
-      console.log("Total Rating:", totalRating);
+    const [averageRatingRows] = await connection.execute(calculateRatingQuery, [prodId]);
+    console.log("Average Rating Rows:", averageRatingRows);
+    const totalRating = averageRatingRows[0].total_rating;
+    console.log("Total Rating:", totalRating);
 
-      const updateTotalRatingQuery = `
+    const updateTotalRatingQuery = `
           UPDATE product
           SET total_rating = ?
           WHERE p_id = ?
       `;
-      const [updateResult] = await connection.promise().query(updateTotalRatingQuery, [totalRating, prodId]);
-      // console.log("Update Result:", updateResult);
+    const [updateResult] = await connection.execute(updateTotalRatingQuery, [totalRating, prodId]);
+    // console.log("Update Result:", updateResult);
 
-      // Fetch and return updated product
-      const getProductQuery = `
+    // Fetch and return updated product
+    const getProductQuery = `
           SELECT *
           FROM product
           WHERE p_id = ?
       `;
-      const [productRows] = await connection.promise().query(getProductQuery, [prodId]);
-      const updatedProduct = productRows[0];
+    const [productRows] = await connection.execute(getProductQuery, [prodId]);
+    const updatedProduct = productRows[0];
 
-      res.json(updatedProduct);
+    res.json(updatedProduct);
   } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Failed to rate product" });
+    console.log(error);
+    res.status(500).json({ message: "Failed to rate product" });
   }
 };
-
 
 // const rating = asyncHandler(async (req, res) => {
 //   const { _id } = req.user;
@@ -716,13 +736,9 @@ const rating = async (req, res) => {
 
 // });
 
-
 const uploadImages = asyncHandler(async (req, res) => {
-
-       
-
-  try{
-    const uploader = (path) => cloudinaryUploadImg(path, 'images');
+  try {
+    const uploader = (path) => cloudinaryUploadImg(path, "images");
     const urls = [];
     const files = req.files;
     for (const file of files) {
@@ -732,27 +748,35 @@ const uploadImages = asyncHandler(async (req, res) => {
       fs.unlinkSync(path);
     }
 
-    const images = urls.map(file=>{return file;})
+    const images = urls.map((file) => {
+      return file;
+    });
 
     res.json(images);
-  }
-  catch(error){
+  } catch (error) {
     console.log(error);
     throw new Error(error);
   }
-
-   
 });
 
 const deleteImages = asyncHandler(async (req, res) => {
-  const {id} = req.params;
-  try{
-    const deleted = cloudinaryDeleteImg(id, 'images');
-    res.json({message:"Deleted Successfully"});
-  }
-  catch(error){
+  const { id } = req.params;
+  try {
+    const deleted = cloudinaryDeleteImg(id, "images");
+    res.json({ message: "Deleted Successfully" });
+  } catch (error) {
     throw new Error(error);
   }
 });
 
-module.exports = {createProduct, getProduct, getAllProducts,updateProduct,deleteProduct, addToWishlist, rating, uploadImages, deleteImages};
+module.exports = {
+  createProduct,
+  getProduct,
+  getAllProducts,
+  updateProduct,
+  deleteProduct,
+  addToWishlist,
+  rating,
+  uploadImages,
+  deleteImages,
+};

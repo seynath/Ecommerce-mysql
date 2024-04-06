@@ -1,39 +1,85 @@
 const Color = require("../models/colorModel");
-const asyncHandler = require("express-async-handler");
 const validateMongoDbId = require("../utils/validateMongodbid");
+const asyncHandler = require("express-async-handler");
 const { pool } = require("../config/db");
+
 
 const createColor = asyncHandler(async (req, res) => {
   const colorName = req.body.title;
   const colorCode = req.body.code;
+
   try {
     const connection = await pool.getConnection();
-    
-    const sql = "SELECT * FROM color WHERE col_name = ?";
-    const [existingColor] = await connection.execute(sql, [colorName]);
-    console.log(req.body.title);
+
+    const sql = "SELECT * FROM color WHERE col_code = ?";
+    const [existingColor] = await connection.execute(sql, [colorCode]);
+
     if (existingColor.length > 0) {
       connection.release();
-      return res.status(400).json({ message: "Color name already exists" });
+      return res.status(400).json({ message: "Color code already exists" });
     }
 
-    const insertColorQuery = "INSERT INTO color (col_name, col_code) VALUES (?, ?)";
+    const insertColorQuery = "INSERT INTO color (col_code, col_name) VALUES (?, ?)";
     const [insertResult] = await connection.execute(insertColorQuery, [
-      colorName, colorCode
+      colorCode, colorName
     ]);
-    console.log(insertResult);
-    // const colorId = insertResult.insertId;
+
+    const colorId = insertResult.insertId;
     console.log(colorId);
-    const getColorQuery = "SELECT * FROM color WHERE col_id = ?";
-    const [colorRows] = await connection.execute(getColorQuery, [colorId]);
+    const getColorQuery = "SELECT * FROM color WHERE col_code = ?";
+    const [colorRows] = await connection.execute(getColorQuery, [colorCode]);
     const newColor = colorRows[0];
-    console.log(newColor);
+
     connection.release();
     return res.json(newColor);
+
   } catch (error) {
     throw new Error(error);
   }
 });
+
+
+// const createColor = asyncHandler(async (req, res) => {
+//   const colorName = req.body.title;
+//   const colorCode = req.body.code;
+//   console.log(req.body.title);
+//   console.log(req.body.code);
+  
+//   try {
+//     const connection = await pool.getConnection();
+    
+//     const sql = "SELECT * FROM color WHERE col_name = ?";
+//     const [existingColor] = await connection.execute(sql, [colorName]);
+//     console.log(existingColor)  
+//     if (existingColor.length > 0) {
+//       console.log("existingColor")  
+//       connection.release();
+//       return res.status(400).json({ message: "Color name already exists" });
+//     }
+//     else{
+      
+//     const insertColorQuery = "INSERT INTO color (col_code, col_name) VALUES (?, ?)";
+//     const [insertResult] = await connection.execute(insertColorQuery, [
+//       colorCode, colorName
+//     ]);
+
+//     console.log(insertResult);
+//     console.log("Athule")
+//     const colorId = insertResult.insertId;
+//     console.log(colorId);
+//     const getColorQuery = "SELECT * FROM color WHERE col_code = ?";
+//     const [colorRows] = await connection.execute(getColorQuery, [colorId]);
+//     const newColor = colorRows[0];
+//     console.log(newColor);
+//     connection.release();
+//     return res.json(newColor);
+//     }
+
+
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 
 // const createColor = asyncHandler(async (req, res) => {
 //   try {
