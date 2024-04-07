@@ -197,8 +197,11 @@ const bcrypt = require("bcrypt");
 
 const createUser = asyncHandler(async (req, res) => {
   try {
-    const { firstname, lastname, email, mobile, password, role, address } =
+    const { firstname, lastname, email, mobile, password } =
       req.body;
+      console.log(req.body)
+      const role = "user";
+      const address = " ";
 
     // Get a connection from the pool
     const connection = await pool.getConnection();
