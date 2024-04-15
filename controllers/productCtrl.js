@@ -23,7 +23,6 @@
 
 const asyncHandler = require("express-async-handler");
 const slugify = require("slugify");
-const validateMongoDBId = require("../utils/validateMongodbid");
 const {
   cloudinaryUploadImg,
   cloudinaryDeleteImg,
@@ -125,8 +124,10 @@ const createProduct = asyncHandler(async (req, res) => {
       size,
       quantity,
     } = req.body;
+    const userID = req.user;
+    console.log({"Userrrrrr": userID})
     const slug = req.body.title ? slugify(req.body.title) : "";
-    console.log({ title, description, brand, quantity, price, category, size });
+    // console.log({ title, description, brand, quantity, price, category, size });
 
     // Insert product into the database
     const connection = await pool.getConnection();
@@ -145,7 +146,7 @@ const createProduct = asyncHandler(async (req, res) => {
 
     // Insert color into the database
     const colorArray = JSON.parse(color); // Convert color to array
-    console.log(colorArray);
+    // console.log(colorArray);
     for (let i = 0; i < colorArray.length; i++) {
       // const colorNameFind = `SELECT col_name FROM color WHERE col_code = ?`;
       // const [colorName] = await connection.execute(colorNameFind, [colorArray[i]]);
@@ -184,7 +185,7 @@ const createProduct = asyncHandler(async (req, res) => {
       const uploader = (path) => cloudinaryUploadImg(path, "images");
       const urls = [];
       const files = req.files;
-      console.log(files);
+      // console.log(files);
       for (let i = 0; i < files.length; i++) {
         const { path } = files[i];
         const newPath = await uploader(path);
@@ -360,31 +361,193 @@ const deleteProduct = asyncHandler(async (req, res) => {
 //   }
 // });
 
+// const getProduct = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   console.log({id})
+
+//   try {
+//     // Connect to MySQL database
+//     const connection = await pool.getConnection();
+
+//     // Execute the SQL SELECT query
+// sql = "SELECT p.product * , size."
+//     const [rows] = await connection.execute("SELECT * FROM product WHERE p_id = ?", [id]);
+
+
+//     // If product is found, send it in the response
+//     if (rows.length > 0) {
+//       res.json(rows[0]);
+//     } else {
+//       res.status(404).json({ message: "Product not found" });
+//     }
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
+
 const getProduct = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   try {
     // Connect to MySQL database
-    const connection = req.connection;
-
-    // Check if connection is established
-    await checkConnection(connection);
+    const connection = await pool.getConnection();
 
     // Execute the SQL SELECT query
-    const [rows] = await connection
-      .promise()
-      .query("SELECT * FROM product WHERE p_id = ?", [id]);
+    const [rows] = await connection.execute(`
+      SELECT
+        p.*,
+        i.image_link,
+        c.col_code,
+        c.col_name,
+        s.size_id,
+        s.size_name
+      FROM
+        product p
+      LEFT JOIN
+        image i ON p.p_id = i.product_id
+      LEFT JOIN
+        color_product cp ON p.p_id = cp.product_id
+      LEFT JOIN
+        color c ON cp.color_code = c.col_code
+      LEFT JOIN
+        size_product sp ON p.p_id = sp.product_id
+      LEFT JOIN
+        size s ON sp.size_id = s.size_id
+      WHERE
+        p.p_id = ?
+    `, [id]);
 
-    // If product is found, send it in the response
-    if (rows.length > 0) {
-      res.json(rows[0]);
-    } else {
-      res.status(404).json({ message: "Product not found" });
+    if (rows.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: "Product not found" });
     }
+
+    // console.log(rows)
+
+    
+    const product = rows.reduce((acc, row) => {
+      const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
+      
+      if (existingProductIndex !== -1) {
+        // If the product already exists in the accumulator, add the image, color, and size to their respective arrays
+        const existingImageIndex = acc[existingProductIndex].images.findIndex(i => i.image_link === row.image_link);
+        const existingColorIndex = acc[existingProductIndex].colors.findIndex(c => c.col_code === row.col_code);
+        const existingSizeIndex = acc[existingProductIndex].sizes.findIndex(s => s.size_id === row.size_id);
+
+        if (existingImageIndex === -1) {
+      acc[existingProductIndex].images.push({
+        image_link: row.image_link,
+      });
+    }
+
+    if (existingColorIndex === -1) {
+      acc[existingProductIndex].colors.push({
+        col_code: row.col_code,
+        col_name: row.col_name
+      });
+    }
+
+    if (existingSizeIndex === -1) {
+      acc[existingProductIndex].sizes.push({
+        size_id: row.size_id,
+        size_name: row.size_name
+      });
+    }
+  } else {
+    // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
+    acc.push({
+      ...row,
+      images: [{
+        image_link: row.image_link,
+      }],
+      colors: [{
+        col_code: row.col_code,
+        col_name: row.col_name
+      }],
+      sizes: [{
+        size_id: row.size_id,
+        size_name: row.size_name
+      }]
+    });
+  }
+
+  return acc;
+}, []);
+
+
+// Process the data to group images, colors, and sizes by product
+// const product = rows.reduce((acc, row) => {
+//   acc.images.push({
+//     image_id: row.image_id,
+//     image_link: row.image_link,
+//   });
+
+//   acc.colors.push({
+//     col_code: row.col_code,
+//     col_name: row.col_name
+//   });
+
+//   acc.sizes.push({
+//     size_id: row.size_id,
+//     size_name: row.size_name
+//   });
+
+//   return acc;
+// }, {
+//   ...rows[0],
+//   images: [],
+//   colors: [],
+//   sizes: [],
+// });
+//     const product = rows.reduce((acc, row) => {
+//   const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
+
+//   if (existingProductIndex !== -1) {
+//     // If the product already exists in the accumulator, add the image, color, and size to their respective arrays
+//     acc[existingProductIndex].images.push({
+//       image_link: row.image_link,
+//     });
+
+//     acc[existingProductIndex].colors.push({
+//       col_code: row.col_code,
+//       col_name: row.col_name
+//     });
+
+//     acc[existingProductIndex].sizes.push({
+//       size_id: row.size_id,
+//       size_name: row.size_name
+//     });
+//   } else {
+//     // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
+//     acc.push({
+//       ...row,
+//       images: [{
+//         image_link: row.image_link,
+//       }],
+//       colors: [{
+//         col_code: row.col_code,
+//         col_name: row.col_name
+//       }],
+//       sizes: [{
+//         size_id: row.size_id,
+//         size_name: row.size_name
+//       }]
+//     });
+//   }
+
+//   return acc;
+// }, []);
+
+    connection.release();
+
+    // Send the processed data in the response
+    res.json(product);
+    
   } catch (error) {
     throw new Error(error);
   }
 });
+
 
 // const getProduct = asyncHandler(async (req, res) => {
 //   const {id} = req.params;
@@ -411,20 +574,125 @@ const getAllProducts = async (req, res) => {
     // Get a MySQL connection from the pool
     const connection = await pool.getConnection();
 
+    sql = 
+    `SELECT  
+    p.*,
+    i.image_id,
+    i.image_link,
+    cat.cat_name
+
+    FROM product p
+
+    LEFT JOIN image i ON p.p_id = i.product_id
+    LEFT JOIN category cat ON p.category_id = cat.cat_id
+     `
+
     // Execute a SELECT query to fetch all users
-    const [rows] = await connection.execute("SELECT * FROM product");
+    // const [rows] = await connection.execute(
+    //   "SELECT * FROM product LEFT JOIN image ON product.p_id = image.product_id");
+    const [rows] = await connection.execute(sql);
+    console.log(rows)
+
     if (rows.length === 0) {
       connection.release();
       return res.status(404).json({ message: "No Products Found" });
     }
+
+    // Process the data to group images by product
+    const products = rows.reduce((acc, row) => {
+      const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
+    
+      if (existingProductIndex !== -1) {
+        // If the product already exists in the accumulator, add the image to its images array
+        acc[existingProductIndex].images.push({
+          image_id: row.image_id,
+          image_link: row.image_link,
+          // Add other image properties here if needed
+        });
+      } else {
+        // If the product doesn't exist in the accumulator, create a new product object with an images array
+        acc.push({
+          ...row,
+          images: [{
+            image_id: row.image_id,
+            image_link: row.image_link,
+            // Add other image properties here if needed
+          }]
+        });
+      }
+    
+      return acc;
+    }, []);
+    // console.log(products)
+    
+
     connection.release();
 
-    // Send the fetched users in the response
-    res.json(rows);
+    // Send the processed data in the response
+    res.json(products);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
+
+// const getAllProducts = async (req, res) => {
+//   try {
+//     // Get a MySQL connection from the pool
+//     const connection = await pool.getConnection();
+
+//     // Execute a SELECT query to fetch all users
+//     const [rows] = await connection.execute("SELECT * FROM product LEFT JOIN image ON product.p_id = image.product_id");
+
+//     if (rows.length === 0) {
+//       connection.release();
+//       return res.status(404).json({ message: "No Products Found" });
+//     }
+
+//     // Process the data to group images by product
+//     const products = rows.reduce((acc, row) => {
+//       const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
+
+//       if (existingProductIndex !== -1) {
+//         // If the product already exists in the accumulator, add the image to its images array
+//         acc[existingProductIndex].images.push(row);
+//       } else {
+//         // If the product doesn't exist in the accumulator, create a new product object with an images array
+//         acc.push({ ...row, images: [row] });
+//       }
+
+//       return acc;
+//     }, []);
+
+//     connection.release();
+
+//     // Send the processed data in the response
+//     res.json(products);
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
+
+// const getAllProducts = async (req, res) => {
+//   try {
+//     // Get a MySQL connection from the pool
+//     const connection = await pool.getConnection();
+
+//     // Execute a SELECT query to fetch all users
+//     // const [rows] = await connection.execute("SELECT * FROM product");
+//     const [rows] = await connection.execute("SELECT * FROM product LEFT JOIN image ON product.p_id = image.product_id")
+//     if (rows.length === 0) {
+//       connection.release();
+//       return res.status(404).json({ message: "No Products Found" });
+//     }
+//     connection.release();
+
+//     // Send the fetched users in the response
+//     res.json(rows);
+//   } catch (error) {
+//     res.status(500).json({ message: error.message });
+//   }
+// };
 
 // const getAllProducts = asyncHandler(async (req, res) => {
 //   try {
@@ -514,8 +782,9 @@ const getAllProducts = async (req, res) => {
 // });
 
 const addToWishlist = asyncHandler(async (req, res) => {
-  const { _id } = req.user;
+  const { id } = req.user;
   const { prodId } = req.body;
+  
   // const  _id = 13;
   try {
     // Connect to MySQL database
@@ -524,23 +793,23 @@ const addToWishlist = asyncHandler(async (req, res) => {
     // Check if the user has already added the product to their wishlist
     const [existingWishlist] = await connection.execute(
       "SELECT * FROM wishlist WHERE user_id = ? AND product_id = ?",
-      [_id, prodId]
+      [id, prodId]
     );
 
     if (existingWishlist.length > 0) {
       // If the product is already in the wishlist, remove it
       await connection.execute(
         "DELETE FROM wishlist WHERE user_id = ? AND product_id = ?",
-        [_id, prodId]
+        [id, prodId]
       );
       res.json({ message: "Product removed from wishlist" });
     } else {
       // If the product is not in the wishlist, add it
       await connection.execute(
         "INSERT INTO wishlist (user_id, product_id) VALUES (?, ?)",
-        [_id, prodId]
+        [id, prodId]
       );
-      res.json({ message: "Product added to wishlist" });
+      res.status(204).json({ message: "Product added to wishlist" });
     }
   } catch (error) {
     throw new Error(error);

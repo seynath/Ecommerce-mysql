@@ -4,7 +4,7 @@ const {createProduct, getProduct, getAllProducts,updateProduct, deleteProduct, a
 const {authMiddleware, isAdmin} = require('../middlewares/authMiddleware');
 const {productImgResize,uploadPhoto} = require('../middlewares/uploadImage');
 
-//mewye piliwela waradunath a kiyanne isAdmin ekata kalin auth magula aawath error ekak enawa 
+//mewye piliwela waradunath a kiyanne isAdmin ekata kalin auth aawath error ekak enawa 
 
 router.post('/', authMiddleware, isAdmin, uploadPhoto.array("images", 10), productImgResize, createProduct);
 // router.post('/',authMiddleware, isAdmin, createProduct);
@@ -12,7 +12,7 @@ router.post('/', authMiddleware, isAdmin, uploadPhoto.array("images", 10), produ
 router.get('/:id', getProduct);
 router.put("/wishlist", authMiddleware, addToWishlist);
 router.put("/rating", authMiddleware, rating);
-router.get('/', getAllProducts )
+router.get('/', getAllProducts );
 router.put('/:id',authMiddleware,isAdmin, updateProduct);
 router.delete('/:id',authMiddleware,isAdmin, deleteProduct);
 router.delete('/delete-img/:id',authMiddleware,isAdmin);

@@ -299,7 +299,7 @@ const loginUser = asyncHandler(async (req, res) => {
 
     // Send the user data and token as a response
     res.json({
-      _id: user.id,
+      id: user.id,
       firstname: user.firstname,
       lastname: user.lastname,
       email: user.email,
@@ -1204,10 +1204,18 @@ const resetPassword = asyncHandler(async (req, res) => {
 // });
 
 const getWishlist = asyncHandler(async (req, res) => {
-  const { _id } = req.user;
+  const { id } = req.user;
+
   try {
-    const findUser = await User.findById(_id).populate("wishlist");
-    res.json(findUser);
+    const connection = await pool.getConnection();
+    const [rows] = await connection.execute('SELECT * FROM wishlist WHERE user_id = ?', [id]);
+    if(rows.length === 0){
+      connection.release();
+      return res.status(404).json({ message: "No Wishlist Found" });
+    }
+    connection.release();
+    res.json(rows);
+
   } catch (error) {
     throw new Error(error);
   }

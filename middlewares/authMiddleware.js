@@ -44,6 +44,7 @@ require("dotenv").config();
 
 const authMiddleware = asyncHandler(async (req, res, next) => {
   const token = req.headers.authorization;
+//   console.log(req.headers.authorization)
 //   console.log('Token received:', token); // Log the token received in the headers
   if (token && token.startsWith('Bearer')) {
       try {
@@ -67,6 +68,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
               throw new Error('Not Authorized, Token Failed1');
           }
           req.user = user;
+
           next();
       } catch (error) {
           throw new Error('Not Authorized, Token Failed2');
