@@ -1223,42 +1223,79 @@ const getWishlist = asyncHandler(async (req, res) => {
 
 
 const userCart = asyncHandler(async (req, res) => {
-  const { cart } = req.body;
+  const { size_color_quantity_id, quantity } = req.body;
   const { id } = req.user;
+
   try {
+    console.log(size_color_quantity_id);
+    console.log(quantity);
+    console.log(id);
+
     const connection = await pool.getConnection();
-    let products = [];
-    const user = await connection.execute('SELECT * FROM users WHERE id = ?', [id]);
-    // check if user already have product in cart
-    const alreadyExistCart = await connection.execute('SELECT * FROM cart WHERE orderby = ?', [user[0].id]);
-    if (alreadyExistCart.length > 0) {
-      await connection.execute('DELETE FROM cart WHERE orderby = ?', [user[0].id]);
+    const [rows] = await connection.execute('SELECT * FROM cart WHERE user_id = ?', [id]);
+    console.log("rows");
+    if(rows.length === 0){
+      await connection.execute('INSERT INTO cart (user_id) VALUES (?)', [id]);
     }
-    for (let i = 0; i < cart.length; i++) {
-      let object = {};
-      object.product_id = cart[i].id;
-      object.count = cart[i].count;
-      object.color = cart[i].color;
-      let getPrice = await connection.execute('SELECT price FROM products WHERE id = ?', [cart[i].id]);
-      object.price = getPrice[0].price;
-      products.push(object);
+    const [rows1] = await connection.execute('SELECT * FROM cart WHERE user_id = ?', [id]);
+    console.log(rows1);
+    const cart_id = rows1[0].cart_id;
+    console.log(cart_id);
+    const [rows2] = await connection.execute('SELECT * FROM cart_items WHERE cart_id = ? AND size_color_quantity_id = ?', [cart_id, size_color_quantity_id]);
+    console.log("rows2");
+    if(rows2.length === 0){
+      await connection.execute('INSERT INTO cart_items (cart_id, size_color_quantity_id, quantity) VALUES (?, ?, ?)', [cart_id, size_color_quantity_id, quantity]);
+      console.log("inserted");
+    } else {
+      await connection.execute('UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND size_color_quantity_id = ?', [quantity, cart_id, size_color_quantity_id]);
+      console.log("updated");
     }
-    let cartTotal = 0;
-    for (let i = 0; i < products.length; i++) {
-      cartTotal = cartTotal + products[i].price * products[i].count;
-    }
-    const result = await connection.execute('INSERT INTO cart (products, cartTotal, orderby) VALUES (?, ?, ?)', [JSON.stringify(products), cartTotal, user[0].id]);
-    const newCart = {
-      id: result.insertId,
-      products,
-      cartTotal,
-      orderby: user[0].id,
-    };
-    res.json(newCart);
+    connection.release();
+
+    res.status(200).json({ message: "Cart Data Received" });
   } catch (error) {
-    throw new Error(error);
+
+    
   }
-});
+})
+
+// const userCart = asyncHandler(async (req, res) => {
+//   const { cart } = req.body;
+//   const { id } = req.user;
+//   try {
+//     const connection = await pool.getConnection();
+//     let products = [];
+//     const user = await connection.execute('SELECT * FROM users WHERE id = ?', [id]);
+//     // check if user already have product in cart
+//     const alreadyExistCart = await connection.execute('SELECT * FROM cart WHERE orderby = ?', [user[0].id]);
+//     if (alreadyExistCart.length > 0) {
+//       await connection.execute('DELETE FROM cart WHERE orderby = ?', [user[0].id]);
+//     }
+//     for (let i = 0; i < cart.length; i++) {
+//       let object = {};
+//       object.product_id = cart[i].id;
+//       object.count = cart[i].count;
+//       object.color = cart[i].color;
+//       let getPrice = await connection.execute('SELECT price FROM products WHERE id = ?', [cart[i].id]);
+//       object.price = getPrice[0].price;
+//       products.push(object);
+//     }
+//     let cartTotal = 0;
+//     for (let i = 0; i < products.length; i++) {
+//       cartTotal = cartTotal + products[i].price * products[i].count;
+//     }
+//     const result = await connection.execute('INSERT INTO cart (products, cartTotal, orderby) VALUES (?, ?, ?)', [JSON.stringify(products), cartTotal, user[0].id]);
+//     const newCart = {
+//       id: result.insertId,
+//       products,
+//       cartTotal,
+//       orderby: user[0].id,
+//     };
+//     res.json(newCart);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
 
 // const userCart = asyncHandler(async (req, res) => {
 //   const { cart } = req.body;
