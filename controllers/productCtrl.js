@@ -29,97 +29,13 @@ const {
 } = require("../utils/cloudinary");
 const fs = require("fs");
 const { pool } = require("../config/db"); // adjust the path according to your project structure
-// const createProduct = asyncHandler(async (req, res) => {
-//   try {
-//     const { title, description, brand, quantity, price } = req.body;
-//     const slug = req.body.title ? slugify(req.body.title) : "";
-
-//     // Insert product into the database
-//     const connection = await pool.getConnection();
-//     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`;
-//     const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price]);
-//     const productId = result.insertId;
-
-//     // Upload images and insert image details into the database
-//     console.log(result)
-//     const uploader = (path) => cloudinaryUploadImg(path, 'images');
-//     const urls = [];
-//     const files = req.files;
-//     for (const file of files) {
-//       const { path } = file;
-//       const newPath = await uploader(path);
-//       urls.push(newPath);
-//       fs.unlinkSync(path);
-
-//       const imageSql = 'INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)';
-//       await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
-//     }
-
-//     connection.release();
-
-//     res.json({ message: "Product created successfully", productId, urls });
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).json({ message: "Failed to create product" });
-//   }
-// });
-
-// const createProduct = asyncHandler(async (req, res) => {
-//   try {
-//     // console.log(req.files)
-//     // let  data = JSON.parse(req.body.data)
-
-//     console.log(req.body)
-//     const { title, description, brand, price, category,color, quantity  } = req.body;
-//     const slug = req.body.title ? slugify(req.body.title) : "";
-
-//     // console.log({ title, description, brand, quantity, price, files: req.files });
-
-//     // Insert product into the database
-//     const connection = await pool.getConnection();
-
-//     const sql = `INSERT INTO product (p_title, p_slug, p_description, brand, quantity, price) VALUES (?, ?, ?, ?, ?, ?)`;
-//     const [result] = await connection.execute(sql, [title, slug, description, brand, quantity, price]);
-//     const productId = result.insertId;
-
-//     // insert to color table
-//     const colorSql = `INSERT INTO color (col_name, product_id) VALUES (?, ?)`;
-//     const [colorResult] = await connection.execute(colorSql, [color, productId]);
-
-//     console.log(colorResult)
-//     // Upload images and insert image details into the database
-//     // console.log(result)
-//     const uploader = (path) => cloudinaryUploadImg(path, 'images');
-//     const urls = [];
-//     const files = req.files;
-//     for (const file of files) {
-//       const { path } = file;
-//       const newPath = await uploader(path);
-//       urls.push(newPath);
-//       // fs.unlinkSync(path);
-
-//       const imageSql = 'INSERT INTO image ( image_link, product_id,  asset_id, public_id) VALUES (?, ?, ?, ?)';
-//       await connection.execute(imageSql, [ newPath.url, productId, newPath.asset_id, newPath.public_id]);
-//     }
-
-//     connection.release();
-
-//     res.json({ message: "Product created successfully", productId, urls });
-//   } catch (error) {
-//     console.log(error);
-//     res.status(500).json({ message: "Failed to create product" });
-//   }
-// });
+const { createCanvas } = require("canvas");
+const Barcode = require("jsbarcode");
+const barcode = require("canvas-barcode");
 
 const createProduct = asyncHandler(async (req, res) => {
   try {
-    const {
-      title,
-      description,
-      brand,
-      category,
-      attributes
-    } = req.body;
+    const { title, description, brand, category, attributes } = req.body;
 
     console.log(title, description, brand, category);
 
@@ -127,7 +43,6 @@ const createProduct = asyncHandler(async (req, res) => {
 
     console.log("before attributes");
 
-  
     const parsedAttributes = JSON.parse(attributes);
 
     // let lowestPrice = Number.MAX_SAFE_INTEGER;
@@ -136,12 +51,11 @@ const createProduct = asyncHandler(async (req, res) => {
     // }
 
     let lowestPrice = Infinity;
-if (parsedAttributes && parsedAttributes.length > 0) {
-  lowestPrice = Math.min(...parsedAttributes.map(attr => parseFloat(attr.price)));
-}
-
-
-    
+    if (parsedAttributes && parsedAttributes.length > 0) {
+      lowestPrice = Math.min(
+        ...parsedAttributes.map((attr) => parseFloat(attr.price))
+      );
+    }
 
     const slug = title ? slugify(title) : "";
 
@@ -155,11 +69,10 @@ if (parsedAttributes && parsedAttributes.length > 0) {
       description,
       brand,
       category,
-      lowestPrice
+      lowestPrice,
     ]);
     const productId = result.insertId;
     console.log(productId);
-
 
     if (parsedAttributes && parsedAttributes.length > 0) {
       parsedAttributes.forEach(async (attribute, index) => {
@@ -168,15 +81,24 @@ if (parsedAttributes && parsedAttributes.length > 0) {
         console.log(`Color: ${attribute.color}`);
         console.log(`Quantity: ${attribute.quantity}`);
         console.log(`Price: ${attribute.price}`);
-    
-        const attributes = `INSERT INTO size_color_quantity (product_id, size_id, color_code, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`;
-    
-        const [resultsAttributes] = await connection.execute(attributes, [productId, attribute.size, attribute.color, attribute.quantity, attribute.price]);
-    
+
+        barcodeValue = `${productId}-${attribute.color}-${attribute.size}`;
+
+        console.log(barcodeValue);
+        
+
+        const attributesSql = `INSERT INTO size_color_quantity (product_id, size_id, color_code, quantity, unit_price, barcode) VALUES (?, ?, ?, ?, ?, ?)`;
+        const [resultsAttributes] = await connection.execute(attributesSql, [
+          productId,
+          attribute.size,
+          attribute.color,
+          attribute.quantity,
+          attribute.price,
+          barcodeValue
+        ]);
+
         console.log(resultsAttributes);
       });
-    } else {
-      console.log("Attributes array is empty");
     }
 
     const uploader = (path) => cloudinaryUploadImg(path, "images");
@@ -201,15 +123,10 @@ if (parsedAttributes && parsedAttributes.length > 0) {
     connection.release();
 
     res.json({ message: "Product created successfully", productId, urls });
-
   } catch (err) {
     res.status(500).json({ message: "Failed to create product" });
   }
 });
-
-
-
-
 
 const AAAcreateProduct = asyncHandler(async (req, res) => {
   try {
@@ -223,10 +140,10 @@ const AAAcreateProduct = asyncHandler(async (req, res) => {
       color,
       size,
       quantity,
-      attributes
+      attributes,
     } = req.body;
     const userID = req.user;
-    console.log({"Userrrrrr": userID})
+    console.log({ Userrrrrr: userID });
     const slug = req.body.title ? slugify(req.body.title) : "";
     // console.log({ title, description, brand, quantity, price, category, size });
 
@@ -474,7 +391,6 @@ const deleteProduct = asyncHandler(async (req, res) => {
 // sql = "SELECT p.product * , size."
 //     const [rows] = await connection.execute("SELECT * FROM product WHERE p_id = ?", [id]);
 
-
 //     // If product is found, send it in the response
 //     if (rows.length > 0) {
 //       res.json(rows[0]);
@@ -491,11 +407,20 @@ const getProduct = asyncHandler(async (req, res) => {
   try {
     // Connect to MySQL database
     const connection = await pool.getConnection();
-    
+
     // Execute the SQL SELECT query
-    const [rows] = await connection.execute(`
+    const [rows] = await connection.execute(
+      `
     SELECT 
-    p.*,
+    p.p_id,
+    p.p_title,
+    p.p_slug,
+    p.p_description,
+    p.brand,
+    p.sold,
+    p.price,
+    p.total_rating,
+    p.category_id,
     scq.*,
     i.image_link,
     s.size_name
@@ -508,30 +433,31 @@ const getProduct = asyncHandler(async (req, res) => {
     size s ON scq.size_id = s.size_id
 
     WHERE p.p_id = ?
-    `, [id]);
+    `,
+      [id]
+    );
 
     if (rows.length === 0) {
       connection.release();
       return res.status(404).json({ message: "Product not found" });
     }
     console.log(rows);
-    
 
     const product = {
       ...rows[0],
       images: [],
-      size_color_quantity: []
+      size_color_quantity: [],
     };
 
-    rows.forEach(row => {
+    rows.forEach((row) => {
       // Add images to the product
-      if (!product.images.find(img => img.image_link === row.image_link)) {
+      if (!product.images.find((img) => img.image_link === row.image_link)) {
         product.images.push({ image_link: row.image_link });
       }
 
       // Add size_color_quantity to the product
       const scqIndex = product.size_color_quantity.findIndex(
-        scq => scq.size_color_quantity_id === row.size_color_quantity_id
+        (scq) => scq.size_color_quantity_id === row.size_color_quantity_id
       );
 
       if (scqIndex === -1) {
@@ -541,7 +467,8 @@ const getProduct = asyncHandler(async (req, res) => {
           size_id: row.size_id,
           size_name: row.size_name,
           color_code: row.color_code,
-          unit_price: row.unit_price
+          quantity: row.quantity,
+          unit_price: row.unit_price,
         });
       }
     });
@@ -563,7 +490,8 @@ const get1Product = asyncHandler(async (req, res) => {
     const connection = await pool.getConnection();
 
     // Execute the SQL SELECT query
-    const [rows] = await connection.execute(`
+    const [rows] = await connection.execute(
+      `
       SELECT
         p.p_id,
         p.p_title,
@@ -586,7 +514,9 @@ const get1Product = asyncHandler(async (req, res) => {
         size_color_quantity scq ON p.p_id = scq.product_id AND s.size_id = scq.size_id AND c.col_code = scq.color_code
       WHERE
         p.p_id = ?
-    `, [id]);
+    `,
+      [id]
+    );
 
     if (rows.length === 0) {
       connection.release();
@@ -596,25 +526,29 @@ const get1Product = asyncHandler(async (req, res) => {
     const product = {
       ...rows[0],
       images: [],
-      size_color_quantity: []
+      size_color_quantity: [],
     };
 
-    rows.forEach(row => {
+    rows.forEach((row) => {
       // Add images to the product
-      if (!product.images.find(img => img.image_link === row.image_link)) {
+      if (!product.images.find((img) => img.image_link === row.image_link)) {
         product.images.push({ image_link: row.image_link });
       }
 
       // Add colors to the product
 
       // Add size_color_quantity to the product
-      if (!product.size_color_quantity.find(scq => scq.size_color_quantity_id === row.size_color_quantity_id)) {
+      if (
+        !product.size_color_quantity.find(
+          (scq) => scq.size_color_quantity_id === row.size_color_quantity_id
+        )
+      ) {
         product.size_color_quantity.push({
           size_color_quantity_id: row.size_color_quantity_id,
           size_id: row.size_id,
           color_code: row.col_code,
           quantity: row.scq_quantity,
-          price: row.scq_price
+          price: row.scq_price,
         });
       }
     });
@@ -635,7 +569,8 @@ const getAProduct = asyncHandler(async (req, res) => {
     const connection = await pool.getConnection();
 
     // Execute the SQL SELECT query
-    const [rows] = await connection.execute(`
+    const [rows] = await connection.execute(
+      `
       SELECT
         p.*,
         i.image_link,
@@ -660,7 +595,9 @@ const getAProduct = asyncHandler(async (req, res) => {
         category cat ON p.category_id = cat.cat_id
       WHERE
         p.p_id = ?
-    `, [id]);
+    `,
+      [id]
+    );
 
     if (rows.length === 0) {
       connection.release();
@@ -669,130 +606,138 @@ const getAProduct = asyncHandler(async (req, res) => {
 
     // console.log(rows)
 
-    
     const product = rows.reduce((acc, row) => {
-      const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
-      
+      const existingProductIndex = acc.findIndex((p) => p.p_id === row.p_id);
+
       if (existingProductIndex !== -1) {
         // If the product already exists in the accumulator, add the image, color, and size to their respective arrays
-        const existingImageIndex = acc[existingProductIndex].images.findIndex(i => i.image_link === row.image_link);
-        const existingColorIndex = acc[existingProductIndex].colors.findIndex(c => c.col_code === row.col_code);
-        const existingSizeIndex = acc[existingProductIndex].sizes.findIndex(s => s.size_id === row.size_id);
+        const existingImageIndex = acc[existingProductIndex].images.findIndex(
+          (i) => i.image_link === row.image_link
+        );
+        const existingColorIndex = acc[existingProductIndex].colors.findIndex(
+          (c) => c.col_code === row.col_code
+        );
+        const existingSizeIndex = acc[existingProductIndex].sizes.findIndex(
+          (s) => s.size_id === row.size_id
+        );
 
         if (existingImageIndex === -1) {
-      acc[existingProductIndex].images.push({
-        image_link: row.image_link,
-      });
-    }
+          acc[existingProductIndex].images.push({
+            image_link: row.image_link,
+          });
+        }
 
-    if (existingColorIndex === -1) {
-      acc[existingProductIndex].colors.push({
-        col_code: row.col_code,
-        col_name: row.col_name
-      });
-    }
+        if (existingColorIndex === -1) {
+          acc[existingProductIndex].colors.push({
+            col_code: row.col_code,
+            col_name: row.col_name,
+          });
+        }
 
-    if (existingSizeIndex === -1) {
-      acc[existingProductIndex].sizes.push({
-        size_id: row.size_id,
-        size_name: row.size_name
-      });
-    }
-  } else {
-    // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
-    acc.push({
-      ...row,
-      images: [{
-        image_link: row.image_link,
-      }],
-      colors: [{
-        col_code: row.col_code,
-        col_name: row.col_name
-      }],
-      sizes: [{
-        size_id: row.size_id,
-        size_name: row.size_name
-      }]
-    });
-  }
+        if (existingSizeIndex === -1) {
+          acc[existingProductIndex].sizes.push({
+            size_id: row.size_id,
+            size_name: row.size_name,
+          });
+        }
+      } else {
+        // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
+        acc.push({
+          ...row,
+          images: [
+            {
+              image_link: row.image_link,
+            },
+          ],
+          colors: [
+            {
+              col_code: row.col_code,
+              col_name: row.col_name,
+            },
+          ],
+          sizes: [
+            {
+              size_id: row.size_id,
+              size_name: row.size_name,
+            },
+          ],
+        });
+      }
 
-  return acc;
-}, []);
+      return acc;
+    }, []);
 
+    // Process the data to group images, colors, and sizes by product
+    // const product = rows.reduce((acc, row) => {
+    //   acc.images.push({
+    //     image_id: row.image_id,
+    //     image_link: row.image_link,
+    //   });
 
-// Process the data to group images, colors, and sizes by product
-// const product = rows.reduce((acc, row) => {
-//   acc.images.push({
-//     image_id: row.image_id,
-//     image_link: row.image_link,
-//   });
+    //   acc.colors.push({
+    //     col_code: row.col_code,
+    //     col_name: row.col_name
+    //   });
 
-//   acc.colors.push({
-//     col_code: row.col_code,
-//     col_name: row.col_name
-//   });
+    //   acc.sizes.push({
+    //     size_id: row.size_id,
+    //     size_name: row.size_name
+    //   });
 
-//   acc.sizes.push({
-//     size_id: row.size_id,
-//     size_name: row.size_name
-//   });
+    //   return acc;
+    // }, {
+    //   ...rows[0],
+    //   images: [],
+    //   colors: [],
+    //   sizes: [],
+    // });
+    //     const product = rows.reduce((acc, row) => {
+    //   const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
 
-//   return acc;
-// }, {
-//   ...rows[0],
-//   images: [],
-//   colors: [],
-//   sizes: [],
-// });
-//     const product = rows.reduce((acc, row) => {
-//   const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
+    //   if (existingProductIndex !== -1) {
+    //     // If the product already exists in the accumulator, add the image, color, and size to their respective arrays
+    //     acc[existingProductIndex].images.push({
+    //       image_link: row.image_link,
+    //     });
 
-//   if (existingProductIndex !== -1) {
-//     // If the product already exists in the accumulator, add the image, color, and size to their respective arrays
-//     acc[existingProductIndex].images.push({
-//       image_link: row.image_link,
-//     });
+    //     acc[existingProductIndex].colors.push({
+    //       col_code: row.col_code,
+    //       col_name: row.col_name
+    //     });
 
-//     acc[existingProductIndex].colors.push({
-//       col_code: row.col_code,
-//       col_name: row.col_name
-//     });
+    //     acc[existingProductIndex].sizes.push({
+    //       size_id: row.size_id,
+    //       size_name: row.size_name
+    //     });
+    //   } else {
+    //     // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
+    //     acc.push({
+    //       ...row,
+    //       images: [{
+    //         image_link: row.image_link,
+    //       }],
+    //       colors: [{
+    //         col_code: row.col_code,
+    //         col_name: row.col_name
+    //       }],
+    //       sizes: [{
+    //         size_id: row.size_id,
+    //         size_name: row.size_name
+    //       }]
+    //     });
+    //   }
 
-//     acc[existingProductIndex].sizes.push({
-//       size_id: row.size_id,
-//       size_name: row.size_name
-//     });
-//   } else {
-//     // If the product doesn't exist in the accumulator, create a new product object with images, colors, and sizes arrays
-//     acc.push({
-//       ...row,
-//       images: [{
-//         image_link: row.image_link,
-//       }],
-//       colors: [{
-//         col_code: row.col_code,
-//         col_name: row.col_name
-//       }],
-//       sizes: [{
-//         size_id: row.size_id,
-//         size_name: row.size_name
-//       }]
-//     });
-//   }
-
-//   return acc;
-// }, []);
+    //   return acc;
+    // }, []);
 
     connection.release();
 
     // Send the processed data in the response
-    res.json({product});
-    
+    res.json({ product });
   } catch (error) {
     throw new Error(error);
   }
 });
-
 
 // const getProduct = asyncHandler(async (req, res) => {
 //   const {id} = req.params;
@@ -819,8 +764,7 @@ const getAllProducts = async (req, res) => {
     // Get a MySQL connection from the pool
     const connection = await pool.getConnection();
 
-    sql = 
-    `SELECT  
+    sql = `SELECT  
     p.*,
     i.image_id,
     i.image_link,
@@ -830,13 +774,13 @@ const getAllProducts = async (req, res) => {
 
     LEFT JOIN image i ON p.p_id = i.product_id
     LEFT JOIN category cat ON p.category_id = cat.cat_id
-     `
+     `;
 
     // Execute a SELECT query to fetch all users
     // const [rows] = await connection.execute(
     //   "SELECT * FROM product LEFT JOIN image ON product.p_id = image.product_id");
     const [rows] = await connection.execute(sql);
-    console.log(rows)
+    console.log(rows);
 
     if (rows.length === 0) {
       connection.release();
@@ -845,9 +789,8 @@ const getAllProducts = async (req, res) => {
 
     // Process the data to group images by product
     const products = rows.reduce((acc, row) => {
+      const existingProductIndex = acc.findIndex((p) => p.p_id === row.p_id);
 
-      const existingProductIndex = acc.findIndex(p => p.p_id === row.p_id);
-    
       if (existingProductIndex !== -1) {
         // If the product already exists in the accumulator, add the image to its images array
         acc[existingProductIndex].images.push({
@@ -859,18 +802,19 @@ const getAllProducts = async (req, res) => {
         // If the product doesn't exist in the accumulator, create a new product object with an images array
         acc.push({
           ...row,
-          images: [{
-            image_id: row.image_id,
-            image_link: row.image_link,
-            // Add other image properties here if needed
-          }]
+          images: [
+            {
+              image_id: row.image_id,
+              image_link: row.image_link,
+              // Add other image properties here if needed
+            },
+          ],
         });
       }
-    
+
       return acc;
     }, []);
     // console.log(products)
-    
 
     connection.release();
 
@@ -917,7 +861,6 @@ const getAllProducts = async (req, res) => {
 //     res.status(500).json({ message: error.message });
 //   }
 // };
-
 
 // const getAllProducts = async (req, res) => {
 //   try {
@@ -1030,7 +973,7 @@ const getAllProducts = async (req, res) => {
 const addToWishlist = asyncHandler(async (req, res) => {
   const { id } = req.user;
   const { prodId } = req.body;
-  
+
   // const  _id = 13;
   try {
     // Connect to MySQL database
@@ -1110,7 +1053,10 @@ const rating = async (req, res) => {
           FROM ratings
           WHERE user_id = ? AND product_id = ?
       `;
-    const [ratingRows] = await connection.execute(checkRatingQuery, [_id, prodId]);
+    const [ratingRows] = await connection.execute(checkRatingQuery, [
+      _id,
+      prodId,
+    ]);
     const alreadyRated = ratingRows.length > 0;
 
     if (alreadyRated) {
@@ -1136,7 +1082,9 @@ const rating = async (req, res) => {
           FROM ratings
           WHERE product_id = ?
       `;
-    const [averageRatingRows] = await connection.execute(calculateRatingQuery, [prodId]);
+    const [averageRatingRows] = await connection.execute(calculateRatingQuery, [
+      prodId,
+    ]);
     console.log("Average Rating Rows:", averageRatingRows);
     const totalRating = averageRatingRows[0].total_rating;
     console.log("Total Rating:", totalRating);
@@ -1146,7 +1094,10 @@ const rating = async (req, res) => {
           SET total_rating = ?
           WHERE p_id = ?
       `;
-    const [updateResult] = await connection.execute(updateTotalRatingQuery, [totalRating, prodId]);
+    const [updateResult] = await connection.execute(updateTotalRatingQuery, [
+      totalRating,
+      prodId,
+    ]);
     // console.log("Update Result:", updateResult);
 
     // Fetch and return updated product
