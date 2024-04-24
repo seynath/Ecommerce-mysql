@@ -1223,39 +1223,42 @@ const getWishlist = asyncHandler(async (req, res) => {
 
 
 const userCart = asyncHandler(async (req, res) => {
-  const { size_color_quantity_id, quantity } = req.body;
+  const { size_color_quantity_id, quantity, product_total } = req.body;
   const { id } = req.user;
 
   try {
-    console.log(size_color_quantity_id);
-    console.log(quantity);
-    console.log(id);
+    // console.log(size_color_quantity_id);
+    // console.log(quantity);
+    // console.log(id);
+    // console.log(product_total);
 
     const connection = await pool.getConnection();
     const [rows] = await connection.execute('SELECT * FROM cart WHERE user_id = ?', [id]);
-    console.log("rows");
+    // console.log("rows");
     if(rows.length === 0){
       await connection.execute('INSERT INTO cart (user_id) VALUES (?)', [id]);
     }
     const [rows1] = await connection.execute('SELECT * FROM cart WHERE user_id = ?', [id]);
-    console.log(rows1);
+    // console.log(rows1);
     const cart_id = rows1[0].cart_id;
-    console.log(cart_id);
+    // console.log(cart_id);
     const [rows2] = await connection.execute('SELECT * FROM cart_items WHERE cart_id = ? AND size_color_quantity_id = ?', [cart_id, size_color_quantity_id]);
-    console.log("rows2");
+    // console.log("rows2");
     if(rows2.length === 0){
-      await connection.execute('INSERT INTO cart_items (cart_id, size_color_quantity_id, quantity) VALUES (?, ?, ?)', [cart_id, size_color_quantity_id, quantity]);
-      console.log("inserted");
+      await connection.execute('INSERT INTO cart_items (cart_id, size_color_quantity_id, quantity, product_total) VALUES (?, ?, ?, ?)', [cart_id, size_color_quantity_id, quantity, product_total]);
+      // console.log("inserted");
     } else {
-      await connection.execute('UPDATE cart_items SET quantity = ? WHERE cart_id = ? AND size_color_quantity_id = ?', [quantity, cart_id, size_color_quantity_id]);
-      console.log("updated");
+      // await connection.execute('UPDATE cart_items SET quantity = ?, product_total = ? WHERE cart_id = ? AND size_color_quantity_id = ?', [quantity, price, cart_id, size_color_quantity_id]);
+
+      await connection.execute('UPDATE cart_items SET quantity = ?, product_total= ? WHERE cart_id = ? AND size_color_quantity_id = ?', [quantity,product_total , cart_id, size_color_quantity_id]);
+      // console.log("updated");
     }
     connection.release();
 
     res.status(200).json({ message: "Cart Data Received" });
   } catch (error) {
 
-    
+    throw new Error(error);
   }
 })
 
@@ -1333,18 +1336,117 @@ const userCart = asyncHandler(async (req, res) => {
 //   }
 // });
 
+const aaagetUserCart = asyncHandler(async (req, res) => {
+  const { id } = req.user;
+
+  try{
+    const connection = await pool.getConnection();
+    const [rows] = await connection.execute('SELECT * FROM cart WHERE user_id = ?', [id]);
+    if(rows.length === 0){
+      connection.release();
+      return res.status(404).json({ message: "No Cart Found" });
+    }
+    const cart_id = rows[0].cart_id;
+    const [rows1] = await connection.execute('SELECT * FROM cart_items WHERE cart_id = ?', [cart_id]);
+
+    // console.log(rows1);
+    connection.release();
+    res.json(rows1);
+  
+  }
+  catch (error) {
+    throw new Error(error);
+  }
+});
+
 const getUserCart = asyncHandler(async (req, res) => {
-  const { _id } = req.user;
-  validateMongoDbId(_id);
+  const { id } = req.user;
+
   try {
-    const cart = await Cart.findOne({ orderby: _id }).populate(
-      "products.product"
+    const connection = await pool.getConnection();
+
+    // Get cart and cart_items data in a single query
+    const [rows] = await connection.execute(
+      'SELECT c.*, ci.* FROM cart c JOIN cart_items ci ON c.cart_id = ci.cart_id WHERE c.user_id = ?',
+      [id]
     );
-    res.json(cart);
+
+    if (rows.length === 0) {
+      connection.release();
+      return res.status(404).json({ message: "No Cart Found" });
+    }
+
+    // Use JOINs to fetch product details and cart product details
+    const productDetailsPromises = rows.map(async (row) => {
+      const [productRows] = await connection.execute(
+        `SELECT p.*, scq.size_id, scq.color_code, scq.quantity as size_color_quantity, scq.unit_price, s.size_name, c.col_name, i.image_link
+        FROM product p
+        JOIN size_color_quantity scq ON p.p_id = scq.product_id
+        JOIN size s ON s.size_id = scq.size_id
+        JOIN color c ON c.col_code = scq.color_code
+        JOIN image i ON i.product_id = p.p_id
+        WHERE scq.size_color_quantity_id = ?
+        `,
+        [row.size_color_quantity_id]
+      );
+
+      return {
+        ...row,
+        productDetails: productRows[0],
+      };
+    });
+
+    const cartWithProductDetails = await Promise.all(productDetailsPromises);
+    // console.log(cartWithProductDetails);
+
+    connection.release();
+    res.json(cartWithProductDetails);
   } catch (error) {
     throw new Error(error);
   }
 });
+
+
+// const getUserCart = asyncHandler(async (req, res) => {
+//   const { _id } = req.user;
+//   validateMongoDbId(_id);
+//   try {
+//     const cart = await Cart.findOne({ orderby: _id }).populate(
+//       "products.product"
+//     );
+//     res.json(cart);
+//   } catch (error) {
+//     throw new Error(error);
+//   }
+// });
+
+const removeFromCartItem = asyncHandler(async (req,res) =>{
+  const {cartItemId} = req.params;
+  const {id} = req.user;
+console.log(cartItemId);
+  try {
+
+    const connection = await pool.getConnection()
+    const sql = `DELETE FROM cart_items WHERE cart_item_id = ?`;
+
+    const [rows] = await connection.execute(sql,[cartItemId])
+
+    console.log(rows);
+    if(rows.length ===0){
+      res.status(400).json({message:"Cart Item Not Found"});
+      connection.release()
+    }
+    connection.release()
+
+
+
+    res.status(200).json({message:"Cart Item Removed"});
+  } catch (error) {
+    
+  }
+
+
+})
 
 const emptyCart = asyncHandler(async (req, res) => {
   const { _id } = req.user;
@@ -1507,6 +1609,7 @@ module.exports = {
   saveAddress,
   userCart,
   getUserCart,
+  removeFromCartItem,
   emptyCart,
   applyCoupon,
   createOrder,

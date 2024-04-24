@@ -473,7 +473,7 @@ const getProduct = asyncHandler(async (req, res) => {
       }
     });
 
-    console.log(product);
+    // console.log(product);
 
     connection.release();
     res.json(product);
@@ -780,7 +780,7 @@ const getAllProducts = async (req, res) => {
     // const [rows] = await connection.execute(
     //   "SELECT * FROM product LEFT JOIN image ON product.p_id = image.product_id");
     const [rows] = await connection.execute(sql);
-    console.log(rows);
+    // console.log(rows);
 
     if (rows.length === 0) {
       connection.release();
